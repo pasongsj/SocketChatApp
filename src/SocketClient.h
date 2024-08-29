@@ -26,8 +26,9 @@ public:
 private:
 
 	// 클라이언트이름
-    std::string MyName; // 클라이언트 이름
+    std::string MyName; 
 
+	// 실행 여부 확인
     std::atomic<bool> m_Running = true;
 
     int m_Trycnt;
