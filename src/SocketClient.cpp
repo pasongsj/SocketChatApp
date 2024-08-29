@@ -10,6 +10,7 @@
 #include <chrono>
 #include <sys/select.h>
 #include <poll.h>
+#include <fcntl.h>
 
 // 소멸자: 자원 정리
 SocketClient::~SocketClient()
@@ -43,6 +44,17 @@ void SocketClient::SocketConnect()
 // 클라이언트 설정
 void SocketClient::Setting() 
 {
+/*	{
+		int flags = fcntl(m_socketFd, F_GETFL, 0);
+		if (flags == -1) 
+		{
+			throw std::runtime_error("fcntl get failed");
+		}
+		if (fcntl(m_socketFd, F_SETFL, flags | O_NONBLOCK) == -1) 
+		{
+			throw std::runtime_error("fcntl set failed");
+		}
+	}*/
     SocketConnect();
 }
 
@@ -60,40 +72,36 @@ bool SocketClient::IsInputAvailable()
 // 사용자 입력 처리
 void SocketClient::HandleInput() 
 {
-    while (m_Running && m_Trycnt < 3) 
-    {
-        if (IsInputAvailable()) 
+    //while (m_Running && m_Trycnt < 3) 
+    //{
+        std::string message;
+        if (std::getline(std::cin, message)) 
         {
-            std::string message;
-            if (std::getline(std::cin, message)) 
+            if (message == "exit") 
             {
-                if (message == "exit") 
-                {
-                    SocketWrite(m_socketFd, "exit", 4); // "exit" 문자열 전송
-                    m_Running = false; // 종료 신호 설정
-                    break;
-                }
-                SocketWrite(m_socketFd, message.c_str(), message.size());
-            } 
-            else 
-            {
-                std::cerr << "입력 오류 발생" << std::endl;
-                m_Running = false;
-                break;
+                SocketWrite(m_socketFd, "exit", 4); // "exit" 문자열 전송
+                m_Running = false; // 종료 신호 설정
+                return;
             }
+            SocketWrite(m_socketFd, message.c_str(), message.size());
+        } 
+        else 
+        {
+            std::cerr << "입력 오류 발생" << std::endl;
+            m_Running = false;
+            return;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    }
-    SocketClose();
+    //}
+    //SocketClose();
 }
 
 // 서버 응답 처리
 void SocketClient::HandleServerResponse() 
 {
     char buffer[1024];
-    while (m_Running) 
-    {
+   // while (m_Running) 
+   // {
         ssize_t bytesRead = SocketRead(m_socketFd, buffer, sizeof(buffer) - 1);
         if (bytesRead > 0 && m_Trycnt < 3) 
         {
@@ -101,36 +109,36 @@ void SocketClient::HandleServerResponse()
             if (bytesRead == 4 && std::string(buffer) == "exit") 
             {
                 m_Running = false;
-                break;
+				return;
             }
-		if(true == MyName.empty())
-		{
-			std::string recv_Message(buffer);
-			if("ERROR" == recv_Message)
+			if(true == MyName.empty())
 			{
-			    m_Trycnt++;
-			    if(m_Trycnt<3)
-			    {
-				std::cout<<"이름을 다시 입력해주세요 : "<< std::flush;
-			    } 
+				std::string recv_Message(buffer);
+				if("ERROR" == recv_Message)
+				{
+					m_Trycnt++;
+					if(m_Trycnt<3)
+					{
+					std::cout<<"이름을 다시 입력해주세요 : "<< std::flush;
+					} 
+				}
+				else
+				{
+					MyName = recv_Message;
+				}
 			}
 			else
-			{
-			    MyName = recv_Message;
+			{	
+            	std::cout << buffer << std::endl;	
 			}
-		}
-		else
-		{	
-            		std::cout << buffer << std::endl;	
-		}
         } 
         else 
         {
             m_Running = false;
             std::cerr << "\n서버와의 연결이 끊어졌습니다." << std::endl;
-            break;
+            return;
         }
-    }
+    //}
 }
 
 // 소켓 실행
@@ -140,18 +148,30 @@ void SocketClient::SocketRunning()
     m_Running = true;
     std::cout<<"이름을 입력하세요 : "<< std::flush;// 버퍼에 담긴 데이터가 모두 쏟아지는 것
 
-    // 서버 응답을 처리할 스레드 시작
-    std::thread responseThread(&SocketClient::HandleServerResponse, this);
+	std::vector<struct pollfd> fds;
+    fds.push_back({m_socketFd, POLLIN, 0});		// 소켓 모니터링
+    fds.push_back({STDIN_FILENO, POLLIN, 0});	// 터미널 입력 모니터링	
 
-    // 사용자 입력 스레드 시작
-    
-    HandleInput();
+    while (true == m_Running) {
+        int ret = poll(fds.data(), fds.size(), 0); // -1 means wait indefinitely
+        if (ret < 0) {
+            perror("Poll failed");
+            close(m_socketFd);
+			break;
+		}
 
+        // 서버에서 온 데이터가 있는지 확인 
+        if (fds[0].revents & POLLIN) 
+		{
+            // 데이터 read 처리
+			HandleServerResponse();
+        }
 
-    // 응답 스레드와 입력 스레드 종료 대기
-    if (responseThread.joinable()) 
-    {
-        responseThread.join();
+        // Check if there is user input
+        if (fds[1].revents & POLLIN) 
+		{
+			HandleInput();
+        }
     }
-
+	SocketClose();
 }
