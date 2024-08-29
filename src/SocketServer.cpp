@@ -267,6 +267,16 @@ void SocketServer::BroadcastMessage(const std::string& message, int senderFd, in
 		case 2:
 			{
 				logmessage = m_ClientNames[senderFd] + " entered";
+				for (int fd : m_ClientSockets)
+                {
+					if ((fd == senderFd) || m_ClientNames[fd] == "Default")
+					{
+						continue;
+					}
+                   SocketWrite(fd, logmessage.c_str(), logmessage.size());
+                }
+				SocketWrite(senderFd,message.c_str(),message.size());
+                break;
 			}
 		case 1:
 			{
