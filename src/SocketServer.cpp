@@ -11,6 +11,14 @@
 #include <algorithm>
 #include <sys/select.h>
 
+
+
+#include <openssl/rsa.h>        /* SSLeay stuff */
+#include <openssl/crypto.h>
+#include <openssl/x509.h>
+#include <openssl/pem.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 // 생성자
 SocketServer::SocketServer(const std::string& ipAddress, int port)
     : SocketBase(ipAddress, port)
@@ -23,12 +31,15 @@ SocketServer::SocketServer(const std::string& ipAddress, int port)
 SocketServer::~SocketServer()
 {
 	std::cout << "SocketServer destructor called." << std::endl;
-    for (int fd : m_ClientSockets)
+    for (SSL* cssl : m_ClientSSL)
     {
-        close(fd); // 클라이언트 소켓 닫기
+		SSL_free(cssl);
+       // close(fd); // 클라이언트 소켓 닫기
     }
-    m_ClientSockets.clear(); // 클라이언트 소켓 목록 비우기
-    SocketClose(); // 메인 소켓 닫기
+    m_ClientSSL.clear(); // 클라이언트 소켓 목록 비우기
+    
+	SSL_CTX_free(ctx);
+	SocketClose(); // 메인 소켓 닫기
     if (m_logFile.is_open())
     {
         m_logFile.close();
@@ -79,12 +90,6 @@ void SocketServer::SocketBind()
     }
 }
 
-#include <openssl/rsa.h>        /* SSLeay stuff */
-#include <openssl/crypto.h>
-#include <openssl/x509.h>
-#include <openssl/pem.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
 
 void SocketServer::InitSSL()
 {
@@ -96,6 +101,8 @@ void SocketServer::InitSSL()
     //SSL_CTX* 
 		
 	ctx = SSL_CTX_new(meth);                // 지정된 초기 값을 이용하여 SSL Context를 생성한다.
+
+//	xSSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
 
 	if(!ctx) 
 	{
@@ -148,67 +155,45 @@ void SocketServer::ConnectNewClient()
 
 	std::cout << "클라이언트 fd 번호 " << clientFd << std::endl;
 
-    m_ClientNames[clientFd] = "Default";
-    m_ClientSockets.push_back(clientFd);
+//    m_ClientNames[clientFd] = "Default";
+//    m_ClientSockets.push_back(clientFd);
 
 
 	/* TCP connection is ready. Do server side SSL. */
-    SSL* ssl = SSL_new(ctx); // 설정된 Context를 이용하여 SSL 세션의 초기화 작업을 수행한다.
+    SSL* clissl = SSL_new(ctx); // 설정된 Context를 이용하여 SSL 세션의 초기화 작업을 수행한다.
     if(nullptr == ssl)
 	{
 		exit(1);
 	}
-    SSL_set_fd(ssl, clientFd);
-    int err = SSL_accept(ssl);    // SSL 세션을 통해 클라이언트의 접속을 대기한다.
+    SSL_set_fd(clissl, clientFd);
+    int err = SSL_accept(clissl);    // SSL 세션을 통해 클라이언트의 접속을 대기한다.
 	if(-1 == err)
 	{
 		exit(1);
 	}
+	m_ClientSSL.push_back(clissl);
+	m_ClientNames[clissl] = "Default";
+	m_ClientFds[clissl] = clientFd;
+	m_mapClientSSL[clientFd] = clissl;
 
-	std::cout<<"클라이언트 인증서 확인"<<std::endl;
-	X509* client_cert = SSL_get_peer_certificate(ssl);
-    char* str = nullptr;
-	if(client_cert != NULL) {
-        printf("Client certificate\n");
-
-        str = X509_NAME_oneline(X509_get_subject_name(client_cert), 0, 0);
-        if(str == nullptr)
-		{
-			exit(1);
-		}
-        printf("t subject: %s\n", str);
-        OPENSSL_free(str);
-
-        str = X509_NAME_oneline(X509_get_issuer_name(client_cert), 0, 0);
-        if(str == nullptr)
-		{
-			exit(1);
-		}
-        printf("t issuer: %s\n", str);
-        OPENSSL_free(str);
-
-        X509_free(client_cert);
-    } else {
-        printf("Client does not have certificate.n");
-    }
 }
 
-void SocketServer::HandleClientData(int _fd)
+void SocketServer::HandleClientData(SSL* cssl)
 {
 	char buffer[1024];
-    ssize_t bytesRead = SocketRead(_fd, buffer, sizeof(buffer) - 1);
+    ssize_t bytesRead = SSL_read(cssl, buffer, sizeof(buffer) - 1);
     if (bytesRead > 0)
     {
 		buffer[bytesRead] = '\0';
         std::string message(buffer);
         if (message == "exit")
         {
-			CloseClientSocket(_fd);
-            m_ClosedClients.push_back(_fd);
+			CloseClientSocket(m_ClientFds[cssl]);
+            m_ClosedClients.push_back(cssl);
         }
         else
         {
-			if (m_ClientNames[_fd] == "Default")
+			if (m_ClientNames[cssl] == "Default")
 			{
 				ToUpper(message);
                 if (
@@ -217,25 +202,25 @@ void SocketServer::HandleClientData(int _fd)
                         message != "DEFAULT" && message != "ERROR"
 					)
                     {
-						m_ClientNames[_fd] = message;
+						m_ClientNames[cssl] = message;
                         m_NameSet.insert(message);
-						BroadcastMessage(message, _fd, 2);
+						BroadcastMessage(message, cssl, 2);
 					}
                 else
                 {
-                    BroadcastMessage("ERROR", _fd, 100);
+                    BroadcastMessage("ERROR", cssl, 100);
                 }
             }
             else
             {
-                BroadcastMessage(m_ClientNames[_fd] + ": " + message, _fd);
+                BroadcastMessage(m_ClientNames[cssl] + ": " + message, cssl);
             }
         }
     }
     else
     {
-		CloseClientSocket(_fd);
-        m_ClosedClients.push_back(_fd);
+		CloseClientSocket(m_ClientFds[cssl]);
+        m_ClosedClients.push_back(cssl);
     }
 }
 
@@ -281,7 +266,7 @@ void SocketServer::SocketAccept()
         {
             if (FD_ISSET(fd, &readfds))
             {
-				HandleClientData(fd);
+				HandleClientData(m_mapClientSSL[fd]);
             }
         }
 
@@ -291,8 +276,8 @@ void SocketServer::SocketAccept()
 }
 
 void SocketServer::RemoveClosedClients() {
-    for (int fd : m_ClosedClients) {
-        auto it = std::find(m_ClientSockets.begin(), m_ClientSockets.end(), fd);
+    for (SSL* cssl : m_ClosedClients) {
+        auto it = std::find(m_ClientSockets.begin(), m_ClientSockets.end(), m_ClientFds[cssl]);
         if (it != m_ClientSockets.end()) {
             m_ClientSockets.erase(it);
         }
@@ -303,20 +288,26 @@ void SocketServer::RemoveClosedClients() {
 void SocketServer::CloseClientSocket(int clientFd)
 {
 	std::string newMessage;
-	if("Default" == m_ClientNames[clientFd])
+	SSL* cssl = m_mapClientSSL[clientFd];
+	if("Default" == m_ClientNames[cssl])
 	{
 		newMessage = "ClientFd: "+std::to_string(clientFd) +" exit";
 	}
 	else
 	{ 
-		newMessage = m_ClientNames[clientFd] + " exit";
+		newMessage = m_ClientNames[cssl] + " exit";
 	}
-	BroadcastMessage(newMessage, clientFd);
-    if (m_ClientNames.find(clientFd) != m_ClientNames.end() && m_ClientNames[clientFd] != "Default")
+	BroadcastMessage(newMessage, cssl);
+   
+	if (m_ClientNames.find(cssl) != m_ClientNames.end() && 
+			m_ClientNames[cssl] != "Default")
     {
-        m_NameSet.erase(m_ClientNames[clientFd]);
-        m_ClientNames.erase(clientFd);
+        m_NameSet.erase(m_ClientNames[cssl]);
+        m_ClientNames.erase(cssl);
     }
+	m_ClientFds.erase(cssl);
+	m_mapClientSSL.erase(clientFd);
+	SSL_free(cssl);
     close(clientFd);
 }
 
@@ -329,7 +320,7 @@ void SocketServer::ToUpper(std::string& str)
 }
 
 // 브로드 캐스트
-void SocketServer::BroadcastMessage(const std::string& message, int senderFd, int flag)
+void SocketServer::BroadcastMessage(const std::string& message, SSL* senderSSL, int flag)
 {
 // -1 : Broadcast하지 않고 로그만 남김
 // 0 : 본인 포함 모든 클라이언트에게 Broadcast
@@ -347,43 +338,43 @@ void SocketServer::BroadcastMessage(const std::string& message, int senderFd, in
 			}
 		case 0:
 			{
-				for (int fd : m_ClientSockets)
+				for (SSL* cssl : m_ClientSSL)
 				{
-					SocketWrite(fd, message.c_str(), message.size());
+					SSL_write(cssl, message.c_str(), message.size());
 				}
 				break;
 			}
 		case 2:
 			{
-				logmessage = m_ClientNames[senderFd] + " entered";
-				for (int fd : m_ClientSockets)
+				logmessage = m_ClientNames[senderSSL] + " entered";
+				for (SSL* cssl : m_ClientSSL)
                 {
-					if ((fd == senderFd) || m_ClientNames[fd] == "Default")
+					if ((cssl == senderSSL) || m_ClientNames[cssl] == "Default")
 					{
 						continue;
 					}
-                   SocketWrite(fd, logmessage.c_str(), logmessage.size());
+                   SSL_write(cssl, logmessage.c_str(), logmessage.size());
                 }
-				SocketWrite(senderFd,message.c_str(),message.size());
+				SSL_write(senderSSL,message.c_str(),message.size());
                 break;
 			}
 		case 1:
 			{
-				for (int fd : m_ClientSockets)
+				for (SSL* cssl : m_ClientSSL)
 				{
-					if ((fd == senderFd) || m_ClientNames[fd] == "Default")
+					if ((cssl == senderSSL) || m_ClientNames[cssl] == "Default")
 					{
 						continue;
 					}
-					SocketWrite(fd, message.c_str(), message.size());
+					SSL_write(cssl, message.c_str(), message.size());
 				}
 				break;
 			}
 
 		case 100:
 			{
-				logmessage = "ClientFd: "+ std::to_string(senderFd) + " Invalid input";
-				SocketWrite(senderFd,message.c_str(),message.size());
+				logmessage = "ClientFd: "+ std::to_string(m_ClientFds[senderSSL]) + " Invalid input";
+				SSL_write(senderSSL,message.c_str(),message.size());
 				break;
 			}
 	}

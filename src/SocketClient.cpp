@@ -51,7 +51,7 @@ void SocketClient::SocketConnect()
 	
 
 
-	SSL* ssl = SSL_new(ctx);  // 세션을 위한 자원을 할당받는다.
+	 ssl = SSL_new(ctx);  // 세션을 위한 자원을 할당받는다.
 	if(nullptr == ssl)
     {
        exit(1);
@@ -98,10 +98,6 @@ void SocketClient::SocketConnect()
 	}
     OPENSSL_free(str);
 
-	        X509_free(client_cert);
-    } else {
-        printf(“Client does not have certificate.n“);
-    }
 
 }
 
@@ -127,7 +123,8 @@ void SocketClient::InitSSL()
 {
 	std::cout<<"initSSl"<<std::endl;
 	/* 암호화 통신을 위한 초기화 작업을 수행한다. */
-    SSL_load_error_strings();
+    SSL_library_init();
+	SSL_load_error_strings();
     SSLeay_add_ssl_algorithms();
     
 	const SSL_METHOD *meth = TLS_client_method();

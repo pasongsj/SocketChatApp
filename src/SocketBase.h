@@ -7,6 +7,13 @@
 #include <cstring>
 #include <unistd.h>  
 
+
+#include <openssl/rsa.h>        /* SSLeay stuff */
+#include <openssl/crypto.h>
+#include <openssl/x509.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 class SocketBase 
 {
 public:
@@ -80,18 +87,23 @@ protected:
     std::string m_ipAddress;  // IP 주소
     int m_port;               // 포트 번호
     int m_socketFd;           // 소켓 파일 디스크립터
-    
+
+	SSL* ssl;
     // 소켓에 데이터 쓰기
     ssize_t SocketWrite(int fd, const void* buffer, size_t length) const 
     {
+	//	return SSL_write(fd, bugger, length);
         return write(fd, buffer, length);
     }
 
     // 소켓에서 데이터 읽기
     ssize_t SocketRead(int fd, void* buffer, size_t length) const 
     {
+	//	return SSL_read(fd, buffer, length);
         return read(fd, buffer, length);
     }
+
+
 
 private:
     // 복사 생성자 및 대입 연산자 삭제
