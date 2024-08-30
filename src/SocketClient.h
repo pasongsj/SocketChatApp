@@ -3,6 +3,7 @@
 #include "SocketBase.h"
 #include <atomic>
 #include <string>
+#include <openssl/ssl.h>
 
 class SocketClient : public SocketBase 
 {
@@ -32,7 +33,11 @@ private:
     std::atomic<bool> m_Running = true;
 
     int m_Trycnt;
-    // 서버에 연결
+    
+
+	SSL_CTX* ctx;
+
+	// 서버에 연결
     void SocketConnect(); 
     
     // 사용자 입력 처리
@@ -44,5 +49,6 @@ private:
     // 비블로킹 입력 확인
     bool IsInputAvailable();
 
+	void InitSSL();
     
 };

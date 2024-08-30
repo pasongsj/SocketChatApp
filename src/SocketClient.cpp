@@ -12,6 +12,15 @@
 #include <poll.h>
 #include <fcntl.h>
 
+
+
+#include <openssl/rsa.h>        /* SSLeay stuff */
+#include <openssl/crypto.h>
+#include <openssl/x509.h>
+#include <openssl/pem.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 // 소멸자: 자원 정리
 SocketClient::~SocketClient()
 {
@@ -39,6 +48,61 @@ void SocketClient::SocketConnect()
     }
 
     std::cout << "서버 연결 완료" << std::endl;
+	
+
+
+	SSL* ssl = SSL_new(ctx);  // 세션을 위한 자원을 할당받는다.
+	if(nullptr == ssl)
+    {
+       exit(1);
+    }
+
+    SSL_set_fd(ssl, m_socketFd);
+    int err = SSL_connect(ssl); // 기존의 connect() 함수 대신 사용하여 서버로 접속한다.
+    if(-1 == err)
+	{
+		exit(1);
+	}
+   
+    /* Following two steps are optional and not required for data exchange to be successful. */
+   
+    /* Get the Cipher – opt */
+    printf("SSL connection using %s\n", SSL_get_cipher(ssl));
+   
+    /* Get server’s certificate (note: beware of dynamic allocation) – opt */
+    /* 서버의 인증서를 받는다. */
+    X509* server_cert = SSL_get_peer_certificate(ssl);
+    if(nullptr == server_cert)
+	{
+		exit(1);
+	}
+
+    printf("Server certificate\n");
+   
+	char* str = nullptr;
+    /* 인증서의 이름을 출력한다. */
+    str = X509_NAME_oneline(X509_get_subject_name(server_cert), 0, 0);
+    if(nullptr == str)
+	{
+		exit(1);
+		printf("t subject: %s\n", str);
+	}
+    OPENSSL_free(str);
+   
+    /* 인증서의 issuer를 출력한다. */
+    str = X509_NAME_oneline(X509_get_issuer_name(server_cert), 0, 0);
+    if(nullptr == str)
+	{
+		exit(1);
+		printf("t issuer: %s\n", str);
+	}
+    OPENSSL_free(str);
+
+	        X509_free(client_cert);
+    } else {
+        printf(“Client does not have certificate.n“);
+    }
+
 }
 
 // 클라이언트 설정
@@ -55,7 +119,47 @@ void SocketClient::Setting()
 			throw std::runtime_error("fcntl set failed");
 		}
 	}*/
+	InitSSL();
     SocketConnect();
+}
+
+void SocketClient::InitSSL()
+{
+	std::cout<<"initSSl"<<std::endl;
+	/* 암호화 통신을 위한 초기화 작업을 수행한다. */
+    SSL_load_error_strings();
+    SSLeay_add_ssl_algorithms();
+    
+	const SSL_METHOD *meth = TLS_client_method();
+    ctx = SSL_CTX_new(meth);
+	if(!ctx) 
+	{
+		fprintf(stderr, "Failed to create SSL_CTX\n");
+        ERR_print_errors_fp(stderr);
+		exit(2);
+    }
+	
+	std::cout<<"set cert file"<<std::endl;
+	const char* pem_file = "./key/client.pem";
+    /* 사용하게 되는 인증서 파일을 설정한다. – opt*/
+    if(SSL_CTX_use_certificate_file(ctx, pem_file, SSL_FILETYPE_PEM) <= 0) {    // 인증서를 파일로 부터 로딩할때 사용함.
+        ERR_print_errors_fp(stderr);
+        exit(3);
+    }
+
+	std::cout<<"set key file"<<std::endl;
+    /* 암호화 통신을 위해서 이용하는 개인 키를 설정한다. – opt */
+    if(SSL_CTX_use_PrivateKey_file(ctx, pem_file, SSL_FILETYPE_PEM) <= 0) {
+        ERR_print_errors_fp(stderr);
+        exit(4);
+    }
+
+	std::cout<<"check key"<<std::endl;
+    /* 개인 키가 사용 가능한 것인지 확인한다. – opt */
+    if(!SSL_CTX_check_private_key(ctx)) {
+        fprintf(stderr, "Private key does not match the certificate public keyn");
+        exit(5);
+    }
 }
 
 // 비블로킹 입력 확인

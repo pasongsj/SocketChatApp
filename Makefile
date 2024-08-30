@@ -1,7 +1,8 @@
 # Makefile
 
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Isrc
+CXXFLAGS = -std=c++17 -Wall -Isrc -I/opt/homebrew/opt/openssl@3/include
+LDFLAGS = -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto
 OBJDIR = build
 SRCDIR = src
 TARGET = $(OBJDIR)/my_socket_app
@@ -15,7 +16,8 @@ all: $(TARGET)
 
 # Link target
 $(TARGET): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) -o $@ $(OBJECTS)
+	@mkdir -p $(OBJDIR)  # Ensure the build directory exists
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(OBJECTS)
 
 # Compile each source file
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
@@ -25,5 +27,5 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 # Clean target
 clean:
 	rm -f $(OBJECTS) $(TARGET)
-	rm -rf log
+	rm -rf $(OBJDIR) log
 

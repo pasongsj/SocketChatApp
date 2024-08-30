@@ -16,6 +16,7 @@ SocketServer::SocketServer(const std::string& ipAddress, int port)
     : SocketBase(ipAddress, port)
 {
     OpenLogFile(); // 로그 파일 열기
+	InitSSL();
 }
 
 // 소멸자
@@ -78,6 +79,53 @@ void SocketServer::SocketBind()
     }
 }
 
+#include <openssl/rsa.h>        /* SSLeay stuff */
+#include <openssl/crypto.h>
+#include <openssl/x509.h>
+#include <openssl/pem.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
+void SocketServer::InitSSL()
+{
+	SSL_library_init();
+	SSL_load_error_strings();
+    SSLeay_add_ssl_algorithms();
+    
+	const SSL_METHOD *meth = TLS_server_method();    // 서버 메소드.
+    //SSL_CTX* 
+		
+	ctx = SSL_CTX_new(meth);                // 지정된 초기 값을 이용하여 SSL Context를 생성한다.
+
+	if(!ctx) 
+	{
+        ERR_print_errors_fp(stderr);
+        exit(2);
+    }
+	// 절대 경로로 인증서 파일 지정
+	const char* pem_file = "./key/server.pem";  // CSR 파일 대신 인증서 파일 사용
+	if (SSL_CTX_use_certificate_file(ctx, pem_file, SSL_FILETYPE_PEM) <= 0) 
+	{
+		ERR_print_errors_fp(stderr);
+		exit(2);
+	}
+
+	/* 암호화 통신을 위해서 이용하는 개인 키를 설정한다. */
+	if (SSL_CTX_use_PrivateKey_file(ctx, pem_file, SSL_FILETYPE_PEM) <= 0) 
+	{
+		ERR_print_errors_fp(stderr);
+		exit(4);
+	}
+
+	/* 개인 키가 사용 가능한 것인지 확인한다. */
+	if (!SSL_CTX_check_private_key(ctx)) 
+	{
+		fprintf(stderr, "Private key does not match the certificate public key\n");
+		exit(5);
+	}
+
+}
+
 // 소켓 리슨
 void SocketServer::SocketListen()
 {
@@ -102,6 +150,47 @@ void SocketServer::ConnectNewClient()
 
     m_ClientNames[clientFd] = "Default";
     m_ClientSockets.push_back(clientFd);
+
+
+	/* TCP connection is ready. Do server side SSL. */
+    SSL* ssl = SSL_new(ctx); // 설정된 Context를 이용하여 SSL 세션의 초기화 작업을 수행한다.
+    if(nullptr == ssl)
+	{
+		exit(1);
+	}
+    SSL_set_fd(ssl, clientFd);
+    int err = SSL_accept(ssl);    // SSL 세션을 통해 클라이언트의 접속을 대기한다.
+	if(-1 == err)
+	{
+		exit(1);
+	}
+
+	std::cout<<"클라이언트 인증서 확인"<<std::endl;
+	X509* client_cert = SSL_get_peer_certificate(ssl);
+    char* str = nullptr;
+	if(client_cert != NULL) {
+        printf("Client certificate\n");
+
+        str = X509_NAME_oneline(X509_get_subject_name(client_cert), 0, 0);
+        if(str == nullptr)
+		{
+			exit(1);
+		}
+        printf("t subject: %s\n", str);
+        OPENSSL_free(str);
+
+        str = X509_NAME_oneline(X509_get_issuer_name(client_cert), 0, 0);
+        if(str == nullptr)
+		{
+			exit(1);
+		}
+        printf("t issuer: %s\n", str);
+        OPENSSL_free(str);
+
+        X509_free(client_cert);
+    } else {
+        printf("Client does not have certificate.n");
+    }
 }
 
 void SocketServer::HandleClientData(int _fd)

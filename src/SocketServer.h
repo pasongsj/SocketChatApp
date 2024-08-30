@@ -7,6 +7,7 @@
 #include <mutex>
 #include <vector>
 #include <fstream>
+#include <openssl/ssl.h>
 
 class SocketServer : public SocketBase 
 {
@@ -34,6 +35,7 @@ private:
 	std::vector<int> m_ClosedClients;			// 닫힌(떠난)클라이언트 소켓
     std::ofstream m_logFile;					// 로그 파일 스트림
 
+	SSL_CTX* ctx;
 
 	// accept
 	void ConnectNewClient();
@@ -55,4 +57,7 @@ private:
 
     // 클라이언트 소켓 리스트에서 닫힌 소켓 제거
     void RemoveClosedClients();
+
+	void InitSSL();
+
 };
