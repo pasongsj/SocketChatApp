@@ -51,7 +51,7 @@ void SocketClient::SocketConnect()
 	
 
 
-	 ssl = SSL_new(ctx);  // 세션을 위한 자원을 할당받는다.
+	ssl = SSL_new(ctx);  // 세션을 위한 자원을 할당받는다.
 	if(nullptr == ssl)
     {
        exit(1);
@@ -118,46 +118,47 @@ void SocketClient::Setting()
 	InitSSL();
     SocketConnect();
 }
-
 void SocketClient::InitSSL()
 {
-	std::cout<<"initSSl"<<std::endl;
-	/* 암호화 통신을 위한 초기화 작업을 수행한다. */
+    std::cout << "initSSL" << std::endl;
+    // SSL 초기화
     SSL_library_init();
-	SSL_load_error_strings();
-    SSLeay_add_ssl_algorithms();
-    
-	const SSL_METHOD *meth = TLS_client_method();
+    SSL_load_error_strings();
+    OpenSSL_add_ssl_algorithms(); // `SSLeay_add_ssl_algorithms` 대신 `OpenSSL_add_ssl_algorithms` 사용
+
+    const SSL_METHOD* meth = TLS_client_method();
     ctx = SSL_CTX_new(meth);
-	if(!ctx) 
-	{
-		fprintf(stderr, "Failed to create SSL_CTX\n");
+    if (!ctx) 
+    {
+        std::cerr << "Failed to create SSL_CTX" << std::endl;
         ERR_print_errors_fp(stderr);
-		exit(2);
+        exit(2);
     }
-	
-	std::cout<<"set cert file"<<std::endl;
-	const char* pem_file = "./key/client.pem";
-    /* 사용하게 되는 인증서 파일을 설정한다. – opt*/
-    if(SSL_CTX_use_certificate_file(ctx, pem_file, SSL_FILETYPE_PEM) <= 0) {    // 인증서를 파일로 부터 로딩할때 사용함.
+    
+    std::cout << "set cert file" << std::endl;
+    const char* pem_file = "./key/client.pem";
+    if (SSL_CTX_use_certificate_file(ctx, pem_file, SSL_FILETYPE_PEM) <= 0) 
+    {
         ERR_print_errors_fp(stderr);
         exit(3);
     }
 
-	std::cout<<"set key file"<<std::endl;
-    /* 암호화 통신을 위해서 이용하는 개인 키를 설정한다. – opt */
-    if(SSL_CTX_use_PrivateKey_file(ctx, pem_file, SSL_FILETYPE_PEM) <= 0) {
+    std::cout << "set key file" << std::endl;
+    if (SSL_CTX_use_PrivateKey_file(ctx, pem_file, SSL_FILETYPE_PEM) <= 0) 
+    {
         ERR_print_errors_fp(stderr);
         exit(4);
     }
 
-	std::cout<<"check key"<<std::endl;
-    /* 개인 키가 사용 가능한 것인지 확인한다. – opt */
-    if(!SSL_CTX_check_private_key(ctx)) {
-        fprintf(stderr, "Private key does not match the certificate public keyn");
+    std::cout << "check key" << std::endl;
+    if (!SSL_CTX_check_private_key(ctx)) 
+    {
+        std::cerr << "Private key does not match the certificate public key" << std::endl;
         exit(5);
     }
 }
+
+
 
 // 비블로킹 입력 확인
 bool SocketClient::IsInputAvailable() 
@@ -170,6 +171,7 @@ bool SocketClient::IsInputAvailable()
     return ret > 0 && (pfd.revents & POLLIN);
 }
 
+
 // 사용자 입력 처리
 void SocketClient::HandleInput() 
 {
@@ -180,12 +182,12 @@ void SocketClient::HandleInput()
         {
             if (message == "exit") 
             {
-                SocketWrite(m_socketFd, "exit", 4); // "exit" 문자열 전송
+                SSL_write(ssl, "exit", 4); // "exit" 문자열 전송
                 m_Running = false; // 종료 신호 설정
                 return;
             }
-            SocketWrite(m_socketFd, message.c_str(), message.size());
-        } 
+            SSL_write(ssl, message.c_str(), message.size());
+		} 
         else 
         {
             std::cerr << "입력 오류 발생" << std::endl;
@@ -203,7 +205,7 @@ void SocketClient::HandleServerResponse()
     char buffer[1024];
    // while (m_Running) 
    // {
-        ssize_t bytesRead = SocketRead(m_socketFd, buffer, sizeof(buffer) - 1);
+        ssize_t bytesRead = SSL_read(ssl, buffer, sizeof(buffer) - 1);
         if (bytesRead > 0 && m_Trycnt < 3) 
         {
             buffer[bytesRead] = '\0'; // 문자열 끝에 NULL 추가
@@ -245,34 +247,43 @@ void SocketClient::HandleServerResponse()
 // 소켓 실행
 void SocketClient::SocketRunning() 
 {
-
     m_Running = true;
-    std::cout<<"이름을 입력하세요 : "<< std::flush;// 버퍼에 담긴 데이터가 모두 쏟아지는 것
+    std::cout << "이름을 입력하세요 : " << std::flush;
 
-	std::vector<struct pollfd> fds;
-    fds.push_back({m_socketFd, POLLIN, 0});		// 소켓 모니터링
-    fds.push_back({STDIN_FILENO, POLLIN, 0});	// 터미널 입력 모니터링	
+    std::vector<struct pollfd> fds;
+    fds.push_back({m_socketFd, POLLIN, 0});     // 소켓 모니터링
+    fds.push_back({STDIN_FILENO, POLLIN, 0});   // 터미널 입력 모니터링
 
-    while (true == m_Running) {
-        int ret = poll(fds.data(), fds.size(), 0); // -1 means wait indefinitely
-        if (ret < 0) {
+    while (m_Running) 
+    {
+        int ret = poll(fds.data(), fds.size(), 1000); // 타임아웃 설정
+        if (ret < 0) 
+        {
             perror("Poll failed");
             close(m_socketFd);
-			break;
-		}
+            break;
+        }
+        if (ret == 0) 
+        {
+            // 타임아웃
+            continue;
+        }
 
         // 서버에서 온 데이터가 있는지 확인 
         if (fds[0].revents & POLLIN) 
-		{
-            // 데이터 read 처리
-			HandleServerResponse();
+        {
+            std::cout << "reading" << std::endl;
+            HandleServerResponse();
         }
 
-        // Check if there is user input
+        // 사용자 입력이 있는지 확인
         if (fds[1].revents & POLLIN) 
-		{
-			HandleInput();
+        {
+            std::cout << "User input" << std::flush;
+            HandleInput();
         }
     }
-	SocketClose();
+    SocketClose();
 }
+
+
