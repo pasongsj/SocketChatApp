@@ -15,7 +15,7 @@
 
 // 생성자
 SocketServer::SocketServer(const std::string& ipAddress, int port)
-    : SocketBase(ipAddress, port)
+    : SocketBase(ipAddress, port), m_Isinit(false)
 {
     OpenLogFile(); // 로그 파일 열기
 }
@@ -120,9 +120,12 @@ void SocketServer::ConnectNewClient()
         return;
     }
 
-    std::cout << "클라이언트 fd 번호 " << clientFd << std::endl;
+	if(false == m_Isinit)
+	{
+		InitializeSSL();
+		m_Isinit = true;
+	}
 
-    InitializeSSL();
     SSL *new_ssl = SSL_new(m_ctx);
 
     if (new_ssl == nullptr) 
@@ -149,7 +152,9 @@ void SocketServer::ConnectNewClient()
     m_SSLClients.push_back(new_ssl);
     m_SSLClientNames[new_ssl] = "Default";
 
-    SSL_write(new_ssl, "connected\n", 10);
+
+	std::string connectmsg = "ClientFd: " + std::to_string(clientFd) + " connected";
+	SSLBroadcastMessage(connectmsg,new_ssl,101); 
 }
 
 // 클라이언트 SSL 데이터 처리
@@ -206,6 +211,8 @@ void SocketServer::SocketAccept()
     fd_set readfds;
     int max_fd = m_socketFd;
 
+	std::cout<<"클라이언트 연결 대기 시작"<<std::flush;
+
     while (true)
     {
         RemoveClosedClients();
@@ -237,7 +244,6 @@ void SocketServer::SocketAccept()
         if (FD_ISSET(m_socketFd, &readfds))
         {
             ConnectNewClient();
-            std::cout << "Client connected" << std::endl;
             continue;
         }
 
@@ -267,11 +273,11 @@ void SocketServer::RemoveClosedClients()
 
             if (m_SSLClientNames[c_ssl] == "Default")
             {
-                newMessage = "ClientFd: " + std::to_string(clientFd) + " exit";
+                newMessage = "ClientFd: " + std::to_string(clientFd) + " leave";
             }
             else
             {
-                newMessage = m_SSLClientNames[c_ssl] + " exit";
+                newMessage = m_SSLClientNames[c_ssl] + " leave";
                 m_NameSet.erase(m_SSLClientNames[c_ssl]);
             }
 
@@ -359,6 +365,12 @@ void SocketServer::SSLBroadcastMessage(const std::string& message, SSL* senderSS
                 std::cerr << "메시지 전송 실패" << std::endl;
             }
             break;
+		case 101:
+			if (SSL_write(senderSSL, message.c_str(), message.size()) <= 0)
+            {
+                std::cerr << "메시지 전송 실패" << std::endl;
+            }
+			break;
     }
     
     // 로그 메시지 기록

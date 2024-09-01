@@ -24,7 +24,10 @@ public:
 private:
     // 클라이언트 이름 집합
     std::set<std::string> m_NameSet;
-    
+   
+	// InitSSL 여부 확인용
+	bool m_Isinit;
+
     // SSL 클라이언트 리스트
     std::vector<SSL*> m_SSLClients;
     

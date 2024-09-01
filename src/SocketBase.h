@@ -13,7 +13,7 @@ class SocketBase
 public:
     // 생성자: IP 주소와 포트 번호를 설정
     SocketBase(const std::string& ipAddress, int port)
-        : m_ipAddress(ipAddress), m_port(port), m_socketFd(-1) 
+        : m_ipAddress(ipAddress), m_port(port), m_socketFd(-1), m_ctx(nullptr) 
     {
     }
 
