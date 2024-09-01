@@ -34,12 +34,14 @@ int main()
     }
 
     // IP 주소와 포트 입력
-    std::cout << "서버 IP 입력: ";
+/*    std::cout << "서버 IP 입력: ";
     std::getline(std::cin, ipAddress);
     std::cout << "서버 포트 입력: ";
     std::cin >> port;
     std::cin.ignore(); // 입력 버퍼에서 개행 문자 제거
-
+*/
+	ipAddress= "127.0.0.1";
+	port = 1234;
 
     try {
         if (choice == 's') {

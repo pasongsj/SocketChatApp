@@ -7,6 +7,9 @@
 #include <mutex>
 #include <vector>
 #include <fstream>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 
 class SocketServer : public SocketBase 
 {
@@ -55,4 +58,16 @@ private:
 
     // 클라이언트 소켓 리스트에서 닫힌 소켓 제거
     void RemoveClosedClients();
+
+
+	////////////ssl
+
+	SSL_CTX* m_ctx;
+	std::vector<SSL*> m_SSLClients;
+	std::vector<SSL*> m_SSLClosedClients;
+	std::map<SSL*, std::string> m_SSLClientNames;
+
+	void InitializeSSL();
+	void HandleClientSSLData(SSL* c_ssl);
+	void SSLBroadcastMessage(const std::string& msg, SSL* senderSSL, int flag = 1);
 };

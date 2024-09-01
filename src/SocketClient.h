@@ -3,6 +3,9 @@
 #include "SocketBase.h"
 #include <atomic>
 #include <string>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <arpa/inet.h>
 
 class SocketClient : public SocketBase 
 {
@@ -40,9 +43,8 @@ private:
     
     // 서버 응답 처리
     void HandleServerResponse(); 
-    
-    // 비블로킹 입력 확인
-    bool IsInputAvailable();
 
-    
+	SSL_CTX* m_ctx;
+	SSL* m_ssl;
+
 };

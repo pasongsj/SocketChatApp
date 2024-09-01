@@ -56,18 +56,40 @@ void SocketClient::Setting()
 		}
 	}*/
     SocketConnect();
+	SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+
+	m_ctx = SSL_CTX_new(TLS_client_method());
+    if (!m_ctx) {
+        std::cerr << "Failed to create SSL context" << std::endl;
+        ERR_print_errors_fp(stderr);
+        exit(1);
+    }
+
+
+	if (SSL_CTX_load_verify_locations(m_ctx, "key/ca.pem", nullptr) <= 0) {
+    std::cerr << "Failed to load CA certificate" << std::endl;
+    ERR_print_errors_fp(stderr);
+    SSL_CTX_free(m_ctx);
+    exit(1);
+	}
+
+	// TLS/SSL 핸드쉐이크를 위한 SSL 객체 생성
+    m_ssl = SSL_new(m_ctx);
+    SSL_set_fd(m_ssl, m_socketFd);
+
+    // TLS/SSL 핸드쉐이크 수행
+    if (SSL_connect(m_ssl) <= 0) {
+        std::cerr << "SSL connect failed" << std::endl;
+        ERR_print_errors_fp(stderr);
+        SSL_free(m_ssl);
+        close(m_socketFd);
+        SSL_CTX_free(m_ctx);
+        exit(1);
+    }
 }
 
-// 비블로킹 입력 확인
-bool SocketClient::IsInputAvailable() 
-{
-    struct pollfd pfd;
-    pfd.fd = STDIN_FILENO;
-    pfd.events = POLLIN; // Read available
-
-    int ret = poll(&pfd, 1, 0); // Non-blocking mode (timeout = 0)
-    return ret > 0 && (pfd.revents & POLLIN);
-}
 
 // 사용자 입력 처리
 void SocketClient::HandleInput() 
@@ -77,13 +99,14 @@ void SocketClient::HandleInput()
         std::string message;
         if (std::getline(std::cin, message)) 
         {
+			SSL_write(m_ssl,message.c_str(),message.size());
             if (message == "exit") 
             {
-                SocketWrite(m_socketFd, "exit", 4); // "exit" 문자열 전송
+            //    SocketWrite(m_socketFd, "exit", 4); // "exit" 문자열 전송
                 m_Running = false; // 종료 신호 설정
                 return;
             }
-            SocketWrite(m_socketFd, message.c_str(), message.size());
+           // SocketWrite(m_socketFd, message.c_str(), message.size());
         } 
         else 
         {
@@ -102,8 +125,9 @@ void SocketClient::HandleServerResponse()
     char buffer[1024];
    // while (m_Running) 
    // {
-        ssize_t bytesRead = SocketRead(m_socketFd, buffer, sizeof(buffer) - 1);
-        if (bytesRead > 0 && m_Trycnt < 3) 
+       // ssize_t bytesRead = SocketRead(m_socketFd, buffer, sizeof(buffer) - 1);
+        ssize_t bytesRead = SSL_read(m_ssl,buffer,sizeof(buffer)-1);
+		if (bytesRead > 0 && m_Trycnt < 3) 
         {
             buffer[bytesRead] = '\0'; // 문자열 끝에 NULL 추가
             if (bytesRead == 4 && std::string(buffer) == "exit") 
@@ -146,8 +170,54 @@ void SocketClient::SocketRunning()
 {
 
     m_Running = true;
-    std::cout<<"이름을 입력하세요 : "<< std::flush;// 버퍼에 담긴 데이터가 모두 쏟아지는 것
+    
+	std::cout<<"이름을 입력하세요 : "<< std::flush;// 버퍼에 담긴 데이터가 모두 쏟아지는 것
 
+	// Poll setup
+    std::vector<struct pollfd> fds;
+    fds.push_back({m_socketFd, POLLIN, 0});     // 소켓 모니터링
+    fds.push_back({STDIN_FILENO, POLLIN, 0});   // 터미널 입력 모니터링 
+
+
+    while (m_Running) {
+        int poll_count = poll(fds.data(), fds.size(), 0);
+        if (poll_count < 0) 
+		{
+            std::cerr << "Poll error" << std::endl;
+            break;
+        }
+
+        if (fds[0].revents & POLLIN) 
+		{
+
+			// 데이터 read 처리
+            HandleServerResponse();
+/*
+
+			char buffer[1024];
+            int len = SSL_read(ssl, buffer, sizeof(buffer) - 1);
+            if (len > 0) {
+                buffer[len] = '\0';
+                std::cout << "Received from server: " << buffer << std::endl;
+            } else {
+                std::cerr << "Server connection closed" << std::endl;
+                break;
+            }
+  */      }
+
+        if (fds[1].revents & POLLIN) 
+		{
+            HandleInput();
+/*
+			std::string message;
+            std::getline(std::cin, message);
+            if (!message.empty()) {
+                SSL_write(ssl, message.c_str(), message.size());
+            }
+  */      }
+    }
+
+	/*
 	std::vector<struct pollfd> fds;
     fds.push_back({m_socketFd, POLLIN, 0});		// 소켓 모니터링
     fds.push_back({STDIN_FILENO, POLLIN, 0});	// 터미널 입력 모니터링	
@@ -174,4 +244,9 @@ void SocketClient::SocketRunning()
         }
     }
 	SocketClose();
+*/
+	SSL_shutdown(m_ssl);
+    SSL_free(m_ssl);
+    close(m_socketFd);
+    SSL_CTX_free(m_ctx);
 }
