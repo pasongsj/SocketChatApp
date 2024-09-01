@@ -1,8 +1,0 @@
-2024-09-01 21:15:27 UM.. entered
-2024-09-01 21:15:31 UM..: hi
-2024-09-01 21:15:38 ClientFd: 6 Invalid input
-2024-09-01 21:15:40 ClientFd: 6 Invalid input
-2024-09-01 21:15:42 ClientFd: 6 Invalid input
-2024-09-01 21:15:43 ? entered
-2024-09-01 21:15:47 ?: e
-2024-09-01 21:15:49 ? exit
