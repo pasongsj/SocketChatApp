@@ -34,12 +34,14 @@ int main()
     }
 
     // IP 주소와 포트 입력
-    std::cout << "서버 IP 입력: ";
+/*    std::cout << "서버 IP 입력: ";
     std::getline(std::cin, ipAddress);
     std::cout << "서버 포트 입력: ";
     std::cin >> port;
     std::cin.ignore(); // 입력 버퍼에서 개행 문자 제거
-
+*/
+	ipAddress= "127.0.0.1";
+	port = 1234;
 
     try {
         if (choice == 's') {
@@ -54,10 +56,8 @@ int main()
 		}
         // 소켓 생성 및 설정
         mySocket->CreateSocket();
-        std::cout << "소켓 생성 완료" << std::endl;
 
         mySocket->Setting();
-        std::cout << "세팅 완료" << std::endl;
 
         // 소켓 실행
         mySocket->SocketRunning();

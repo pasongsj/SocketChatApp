@@ -1,4 +1,4 @@
-//SocketBase.h
+// SocketBase.h
 #pragma once
 
 #include <string>
@@ -6,39 +6,36 @@
 #include <arpa/inet.h> 
 #include <cstring>
 #include <unistd.h>  
+#include <openssl/ssl.h>
 
 class SocketBase 
 {
 public:
     // 생성자: IP 주소와 포트 번호를 설정
     SocketBase(const std::string& ipAddress, int port)
-	: m_ipAddress(ipAddress), m_port(port), m_socketFd(-1) 
+        : m_ipAddress(ipAddress), m_port(port), m_socketFd(-1), m_ctx(nullptr) 
     {
-    	// 생성자: IP 주소와 포트를 초기화하고 소켓 파일 디스크립터를 -1로 설정
     }
 
     // 소멸자: 소켓 종료
     virtual ~SocketBase()
     {
-    	// 소멸자: 소켓 종료
         SocketClose();
     }
 
     // 소켓 생성
     void CreateSocket()
     {
-    	// 소켓 생성
-    	m_socketFd = socket(AF_INET, SOCK_STREAM, 0);
-    	if (m_socketFd == -1) 
-    	{
-            throw std::runtime_error("소켓 생성에 실패했습니다."); // 에러 메시지
+        m_socketFd = socket(AF_INET, SOCK_STREAM, 0);
+        if (m_socketFd == -1) 
+        {
+            throw std::runtime_error("소켓 생성에 실패했습니다.");
         }
     }
 
     // 소켓 종료
     void SocketClose()
     {
-        // 소켓 종료
         if (m_socketFd != -1) 
         {
             close(m_socketFd);
@@ -47,10 +44,10 @@ public:
     }
 
     // 설정 메서드 (서브클래스에서 재정의 가능)
-    virtual void Setting() {}
+    virtual void Setting() = 0;
 
     // 소켓 실행 메서드 (서브클래스에서 재정의 가능)
-    virtual void SocketRunning() {}
+    virtual void SocketRunning() = 0;
 
     // IP 주소 설정
     void SetIp(const std::string& ipAddress) 
@@ -80,7 +77,10 @@ protected:
     std::string m_ipAddress;  // IP 주소
     int m_port;               // 포트 번호
     int m_socketFd;           // 소켓 파일 디스크립터
-    
+
+    SSL_CTX* m_ctx;           // SSL_CTX 객체
+    // SSL* m_ssl;            // SSL 객체가 주석처리되어 있어 제거되었습니다.
+
     // 소켓에 데이터 쓰기
     ssize_t SocketWrite(int fd, const void* buffer, size_t length) const 
     {
