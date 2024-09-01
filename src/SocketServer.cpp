@@ -23,19 +23,36 @@ SocketServer::SocketServer(const std::string& ipAddress, int port)
 SocketServer::~SocketServer()
 {
 	std::cout << "SocketServer destructor called." << std::endl;
-    for (int fd : m_ClientSockets)
+ /*   for (int fd : m_ClientSockets)
     {
         close(fd); // 클라이언트 소켓 닫기
     }
     m_ClientSockets.clear(); // 클라이언트 소켓 목록 비우기
-    SocketClose(); // 메인 소켓 닫기
+    SocketClose(); // 메인 소켓 닫기*/
     if (m_logFile.is_open())
     {
         m_logFile.close();
     }
 
-	close(m_socketFd);
+	for (SSL* ssl : m_SSLClients) 
+	{
+        if (ssl != nullptr)
+		{
+            int clientFd = SSL_get_fd(ssl); // 소켓 디스크립터를 가져옵니다.
+            // SSL 연결 종료
+            SSL_shutdown(ssl);
+            // SSL 객체 해제
+            SSL_free(ssl);
+            // 소켓 닫기
+            if (clientFd >= 0) {
+                close(clientFd);
+            }
+        }
+    }
+    m_SSLClients.clear(); // 벡터를 비워서 포인터들을 제거합니다.
+
     SSL_CTX_free(m_ctx);
+	close(m_socketFd);
 }
 
 // 로그 폴더 생성
@@ -104,8 +121,8 @@ void SocketServer::ConnectNewClient()
 
 	std::cout << "클라이언트 fd 번호 " << clientFd << std::endl;
 
-    m_ClientNames[clientFd] = "Default";
-    m_ClientSockets.push_back(clientFd);
+//    m_ClientNames[clientFd] = "Default";
+//    m_ClientSockets.push_back(clientFd);
 ///////////SSL handshake///////
 	InitializeSSL();
 	SSL *new_ssl = SSL_new(m_ctx);
@@ -138,7 +155,6 @@ void SocketServer::ConnectNewClient()
 
 void SocketServer::HandleClientSSLData(SSL* c_ssl)
 {
-	std::cout<<"recv check";
 	char buffer[1024];
     int len = SSL_read(c_ssl, buffer, sizeof(buffer) - 1);
     if (len > 0) 
@@ -189,7 +205,7 @@ void SocketServer::HandleClientSSLData(SSL* c_ssl)
 
 
 
-
+/*
 
 void SocketServer::HandleClientData(int _fd)
 {
@@ -237,7 +253,7 @@ void SocketServer::HandleClientData(int _fd)
         m_ClosedClients.push_back(_fd);
     }
 }
-
+*/
 
 // 소켓 에셉
 void SocketServer::SocketAccept()
@@ -319,17 +335,24 @@ void SocketServer::RemoveClosedClients() {
 	{
 		if(nullptr != c_ssl)
 		{
-			if("Default" != m_SSLClientNames[c_ssl])
+			std::string newMessage;
+			int clientFd = SSL_get_fd(c_ssl);
+			if("Default" == m_SSLClientNames[c_ssl])
 			{
+				newMessage = "ClientFd: "+std::to_string(clientFd) +" exit";
+			}
+			else
+			{
+				newMessage = m_SSLClientNames[c_ssl] + " exit";
 				m_NameSet.erase(m_SSLClientNames[c_ssl]);
 			}
-			int clientFd = SSL_get_fd(c_ssl);
+			SSLBroadcastMessage(newMessage, c_ssl);
+
 			m_SSLClients.erase(std::find(m_SSLClients.begin(),m_SSLClients.end(),c_ssl));
             m_SSLClientNames.erase(c_ssl);
 			SSL_shutdown(c_ssl);
 			SSL_free(c_ssl);
 			close(clientFd);
-			std::cout<<"erase"<<clientFd<<std::endl;
 		}
 		
 	}
@@ -343,7 +366,7 @@ void SocketServer::RemoveClosedClients() {
         }
     }*/
 }
-
+/*
 // 종료한 클라이언트 정보 지우기
 void SocketServer::CloseClientSocket(int clientFd)
 {
@@ -363,7 +386,7 @@ void SocketServer::CloseClientSocket(int clientFd)
         m_ClientNames.erase(clientFd);
     }
     close(clientFd);
-}
+}*/
 
 // 대문자처리
 void SocketServer::ToUpper(std::string& str)
@@ -436,6 +459,8 @@ void SocketServer::SSLBroadcastMessage(const std::string& message, SSL* senderSS
     LogEvent(logmessage);
 
 }
+
+/*
 // 브로드 캐스트
 void SocketServer::BroadcastMessage(const std::string& message, int senderFd, int flag)
 {
@@ -498,7 +523,7 @@ void SocketServer::BroadcastMessage(const std::string& message, int senderFd, in
 	LogEvent(logmessage);
 
 }
-
+*/
 void SocketServer::Setting()
 {
 	// 소켓 옵션 설정

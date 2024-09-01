@@ -6,6 +6,8 @@
 #include <arpa/inet.h> 
 #include <cstring>
 #include <unistd.h>  
+#include <openssl/ssl.h>
+
 
 class SocketBase 
 {
@@ -47,10 +49,10 @@ public:
     }
 
     // 설정 메서드 (서브클래스에서 재정의 가능)
-    virtual void Setting() {}
+    virtual void Setting() = 0;
 
     // 소켓 실행 메서드 (서브클래스에서 재정의 가능)
-    virtual void SocketRunning() {}
+    virtual void SocketRunning() = 0;
 
     // IP 주소 설정
     void SetIp(const std::string& ipAddress) 
@@ -80,7 +82,13 @@ protected:
     std::string m_ipAddress;  // IP 주소
     int m_port;               // 포트 번호
     int m_socketFd;           // 소켓 파일 디스크립터
-    
+
+	/////////////////SSL
+    SSL_CTX* m_ctx;
+  //  SSL* m_ssl;
+
+
+
     // 소켓에 데이터 쓰기
     ssize_t SocketWrite(int fd, const void* buffer, size_t length) const 
     {

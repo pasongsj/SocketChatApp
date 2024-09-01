@@ -56,10 +56,8 @@ int main()
 		}
         // 소켓 생성 및 설정
         mySocket->CreateSocket();
-        std::cout << "소켓 생성 완료" << std::endl;
 
         mySocket->Setting();
-        std::cout << "세팅 완료" << std::endl;
 
         // 소켓 실행
         mySocket->SocketRunning();

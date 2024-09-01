@@ -44,7 +44,7 @@ private:
     // 서버 응답 처리
     void HandleServerResponse(); 
 
-	SSL_CTX* m_ctx;
+//	SSL_CTX* m_ctx;
 	SSL* m_ssl;
 
 };
