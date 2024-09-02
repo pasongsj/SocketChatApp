@@ -140,6 +140,7 @@ void SocketServer::ConnectNewClient()
     std::cout << "SSL handshake 시작" << std::endl;
 
     // TLS/SSL 핸드쉐이크 수행
+    // SSL_accept()는 클라이언트로부터 수신된 요청을 처리하고, SSL/TLS 핸드쉐이크 과정의 모든 단계(인증서 교환, 암호화 설정 등)를 진행
     if (SSL_accept(new_ssl) <= 0) 
     {
         std::cerr << "SSL accept failed" << std::endl;
@@ -309,6 +310,7 @@ void SocketServer::SSLBroadcastMessage(const std::string& message, SSL* senderSS
 // 1 : 본인 제외 모든 클라이언트에게 Broadcast
 // 2: 이름 설정 성공
 // 100 : 이름 설정 실패(senderFd에게만 send)
+// 101 : sender에게만 보냄
     std::string logMessage = message;
 
     switch (flag)
@@ -365,8 +367,9 @@ void SocketServer::SSLBroadcastMessage(const std::string& message, SSL* senderSS
                 std::cerr << "메시지 전송 실패" << std::endl;
             }
             break;
-		case 101:
-			if (SSL_write(senderSSL, message.c_str(), message.size()) <= 0)
+	case 101:
+	    // 발신자에게만 메세지 전송
+	    if (SSL_write(senderSSL, message.c_str(), message.size()) <= 0)
             {
                 std::cerr << "메시지 전송 실패" << std::endl;
             }
@@ -403,10 +406,10 @@ void SocketServer::InitializeSSL()
     // OpenSSL 라이브러리 초기화
     SSL_library_init();
     SSL_load_error_strings();
-    OpenSSL_add_all_algorithms();
+    OpenSSL_add_all_algorithms(); // OpenSSL에서 지원하는 모든 알고리즘을 로드하는 것.
 
     // SSL 컨텍스트 생성
-    m_ctx = SSL_CTX_new(TLS_server_method());
+    m_ctx = SSL_CTX_new(TLS_server_method());  // TLS_server_method() : 서버 측에서 사용할 SSL/TLS 프로토콜 메서드를 반환. 최신 TLS 프로토콜을 지원하며, 서버용 SSL/TLS 연결을 설정할 때 사용함
     if (!m_ctx)
     {
         std::cerr << "Failed to create SSL context" << std::endl;
@@ -423,7 +426,7 @@ void SocketServer::InitializeSSL()
         SSL_CTX_free(m_ctx);
         exit(1);
     }
-
+/*
     // CA 인증서 로드
     if (SSL_CTX_load_verify_locations(m_ctx, "key/ca.pem", nullptr) <= 0)
     {
@@ -431,7 +434,7 @@ void SocketServer::InitializeSSL()
         ERR_print_errors_fp(stderr);
         SSL_CTX_free(m_ctx);
         exit(1);
-    }
+    }*/
 
     // SSL 초기화 성공 메시지
     std::cout << "서버 SSL 초기화 성공" << std::endl;
