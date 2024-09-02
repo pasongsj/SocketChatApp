@@ -102,6 +102,14 @@ void SocketClient::Setting()
         SSL_CTX_free(m_ctx);
         exit(1);
     }
+
+    char buffer[1024];
+    ssize_t bytesRead = SSL_read(m_ssl, buffer, sizeof(buffer) - 1);
+    if (bytesRead > 0) 
+    {
+        buffer[bytesRead] = '\0'; // 문자열 끝에 NULL 추가
+	std::cout<<"Server Message :" << buffer << std::endl;
+    }
 }
 
 // 사용자 입력 처리
@@ -148,7 +156,11 @@ void SocketClient::HandleServerResponse()
                 if (m_Trycnt < 3) 
                 {
                     std::cout << "이름을 다시 입력해주세요 : " << std::flush;
-                } 
+                }
+		else
+		{
+		    m_Running = false;
+		}
             }
             else 
             {
@@ -157,6 +169,7 @@ void SocketClient::HandleServerResponse()
         } 
         else 
         {
+		std::cout<<MyName;
             std::cout << buffer << std::endl;
         }
     } 
