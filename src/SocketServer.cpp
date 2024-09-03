@@ -115,7 +115,10 @@ void SocketServer::ConnectNewClient()
     sockaddr_in clientAddr{};
     socklen_t clientAddrLen = sizeof(clientAddr);
     int clientFd = accept(m_socketFd, (struct sockaddr*)&clientAddr, &clientAddrLen);
-    
+   
+    fcntl(clientFd, F_GETFL, 0);
+
+
     if (clientFd == -1)
     {
         std::cerr << "클라이언트 수락 실패" << std::endl;

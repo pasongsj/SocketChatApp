@@ -18,17 +18,19 @@ void signalHandler(int signal) {
 }
 int main() 
 {
-    char choice;
+//    char choice;
     std::string ipAddress;
     int port;
 
     // 서버 또는 클라이언트 선택
     std::cout << "서버(s) 또는 클라이언트(c) 선택: ";
-    std::cin >> choice;
-    std::cin.ignore(); // 입력 버퍼에서 개행 문자 제거
-
+   // std::cin >> choice;
+   // std::cin.ignore(); // 입력 버퍼에서 개행 문자 제거
+	std::string choice;
+    std::getline(std::cin, choice);
+   
     // 유효한 선택인지 검사
-    if (choice != 's' && choice != 'c') {
+    if (choice[0] != 's' && choice[0] != 'c') {
         std::cerr << "잘못된 입력입니다." << std::endl;
         return 1; // 비정상 종료
     }
@@ -44,11 +46,15 @@ int main()
 	port = 1234;
 
     try {
-        if (choice == 's') {
+        if (choice[0] == 's') 
+		{
             mySocket = std::make_unique<SocketServer>(ipAddress, port);
-        } else if (choice == 'c') {
+        } 
+		else if (choice[0] == 'c') 
+		{
             mySocket = std::make_unique<SocketClient>(ipAddress, port);
         }
+		
 		if (SIG_ERR == signal(SIGINT, signalHandler)) 
 		{
 			std::cerr << "Error setting up signal handler." << std::endl;
@@ -58,7 +64,7 @@ int main()
         mySocket->CreateSocket();
 
         mySocket->Setting();
-
+		std::cout<<"main setting done"<<std::endl;
         // 소켓 실행
         mySocket->SocketRunning();
     } 

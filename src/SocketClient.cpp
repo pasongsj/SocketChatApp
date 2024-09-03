@@ -68,7 +68,9 @@ void SocketClient::SocketConnect()
 // 클라이언트 설정
 void SocketClient::Setting() 
 {
-    SocketConnect();
+//	int flags = fcntl(m_socketFd, F_GETFL, 0);
+ //   fcntl(m_socketFd, F_SETFL, flags | O_NONBLOCK);
+	SocketConnect();
 
     SSL_library_init();
     SSL_load_error_strings();
@@ -108,8 +110,47 @@ void SocketClient::Setting()
     }
 
 	m_socketFd = SSL_get_fd(m_ssl);
-	fcntl(m_socketFd, F_GETFL, 0);
-	std::cout<<"ssl handshake done\n";
+//	fcntl(m_socketFd, F_GETFL, 0);
+//	std::cout<<"ssl handshake done\n";
+
+//	std::cout<<"이름을 입력하세요 : ";
+
+	std::cout<<m_socketFd<<" input your name: ";
+	std::cout.flush();
+	std::vector<struct pollfd> fds;
+	fds.push_back({STDIN_FILENO, POLLIN, 0});   // 터미널 입력 모니터링
+    fds.push_back({m_socketFd, POLLIN, 0});     // 소켓 모니터링
+
+
+    while (m_Running)
+    {
+		int poll_count = poll(fds.data(), fds.size(), 500);
+		if (poll_count < 0)
+        {
+            std::cerr << "Poll error" << std::endl;
+            break;
+        }
+		if (fds[0].revents & POLLIN)
+        {
+			std::cout<<"input start"<<std::endl;
+			HandleInput();
+        }
+
+        if (fds[1].revents & POLLIN)
+        {
+			std::cout<<"response start"<<std::endl;
+			// 데이터 read 처리
+            HandleServerResponse();
+        }
+
+    }
+    SSL_shutdown(m_ssl);
+    SSL_free(m_ssl);
+    close(m_socketFd);
+    SSL_CTX_free(m_ctx);
+	m_ctx = nullptr;
+
+
 }
 
 // 사용자 입력 처리
@@ -124,6 +165,7 @@ void SocketClient::HandleInput()
             m_Running = false;
             return;
         }
+		std::cout<<"input done\n";
     } 
     else 
     {
@@ -138,7 +180,8 @@ void SocketClient::HandleServerResponse()
 {
     char buffer[1024];
     ssize_t bytesRead = SSL_read(m_ssl, buffer, sizeof(buffer) - 1);
-    if (bytesRead > 0 && m_Trycnt < 3) 
+	std::cout<<"read not blocking";
+	if (bytesRead > 0 && m_Trycnt < 3) 
     {
         buffer[bytesRead] = '\0'; // 문자열 끝에 NULL 추가
         if (bytesRead == 4 && std::string(buffer) == "exit") 
@@ -181,23 +224,22 @@ void SocketClient::HandleServerResponse()
     }
 }
 
+
 // 소켓 실행
 void SocketClient::SocketRunning() 
 {
-    m_Running = true;
-    std::cout << "이름을 입력하세요 : " << std::flush;
-
+	//std::cout << "이름을 입력하세요 : ";
+/*
     // Poll setup
     std::vector<struct pollfd> fds;
-    fds.push_back({STDIN_FILENO, POLLIN, 0});   // 터미널 입력 모니터링
-	fds.push_back({m_socketFd, POLLIN, 0});     // 소켓 모니터링
+	fds.push_back({STDIN_FILENO, POLLIN, 0});   // 터미널 입력 모니터링
+    fds.push_back({m_socketFd, POLLIN, 0});     // 소켓 모니터링
 
 
-	sleep(2);
     while (m_Running) 
     {
 //        int poll_count = poll(fds.data(), fds.size(), 500);
-		int poll_count = poll(fds.data(), fds.size(), 0);
+		int poll_count = poll(fds.data(), fds.size(), 500);
 		if (poll_count < 0) 
         {
             std::cerr << "Poll error" << std::endl;
@@ -205,12 +247,12 @@ void SocketClient::SocketRunning()
         }
 		if (fds[0].revents & POLLIN)
         {
-            HandleInput();
+			HandleInput();
         }
 
         if (fds[1].revents & POLLIN) 
         {
-            // 데이터 read 처리
+			// 데이터 read 처리
             HandleServerResponse();
         }
 
@@ -221,4 +263,4 @@ void SocketClient::SocketRunning()
     close(m_socketFd);
     SSL_CTX_free(m_ctx);
 	m_ctx = nullptr;
-}
+*/}
