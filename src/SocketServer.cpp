@@ -156,12 +156,6 @@ void SocketServer::ConnectNewClient()
     m_SSLClientNames[new_ssl] = "Default";
 
 
-	std::string connectmsg = "ClientFd: " + std::to_string(clientFd) + " connected";
-//	SSLBroadcastMessage(connectmsg,new_ssl,101); 
-
-	char buffer[1024];
-	SSL_read(new_ssl,buffer,1);
-
 	fcntl(clientFd, F_GETFL, 0);
 
 }

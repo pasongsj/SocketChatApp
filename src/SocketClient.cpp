@@ -107,16 +107,8 @@ void SocketClient::Setting()
         exit(1);
     }
 
-	SSL_write(m_ssl," ",1);
 	m_socketFd = SSL_get_fd(m_ssl);
 	fcntl(m_socketFd, F_GETFL, 0);
-/*    char buffer[1024];
-    ssize_t bytesRead = SSL_read(m_ssl, buffer, sizeof(buffer) - 1);
-    if (bytesRead > 0) 
-    {
-        buffer[bytesRead] = '\0'; // 문자열 끝에 NULL 추가
-	    std::cout<<"Server Message :" << buffer << std::endl;
-    }*/
 	std::cout<<"ssl handshake done\n";
 }
 
@@ -204,7 +196,8 @@ void SocketClient::SocketRunning()
 	sleep(2);
     while (m_Running) 
     {
-        int poll_count = poll(fds.data(), fds.size(), 500);
+//        int poll_count = poll(fds.data(), fds.size(), 500);
+		int poll_count = poll(fds.data(), fds.size(), 0);
 		if (poll_count < 0) 
         {
             std::cerr << "Poll error" << std::endl;
