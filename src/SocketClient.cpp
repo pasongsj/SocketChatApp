@@ -127,7 +127,6 @@ void SocketClient::HandleInput()
     if (std::getline(std::cin, message)) 
     {
         SSL_write(m_ssl, message.c_str(), message.size());
-		std::cout<<"input done"<<std::endl;
 		if (message == "exit") 
         {
             m_Running = false;
@@ -174,7 +173,8 @@ void SocketClient::HandleServerResponse()
             else 
             {
                 MyName = recv_Message;
-            }
+//				std::cout<<"MyName is set "<<MyName<<std::endl;
+			}
         } 
         else 
         {
@@ -210,17 +210,12 @@ void SocketClient::SocketRunning()
             std::cerr << "Poll error" << std::endl;
             break;
         }
-		if(poll_count == 1)
-		{
-			continue;
-		}
 		if (fds[0].revents & POLLIN)
         {
-			AnyInput = true;
             HandleInput();
         }
 
-        if (true == AnyInput && (fds[1].revents & POLLIN)) 
+        if (fds[1].revents & POLLIN) 
         {
             // 데이터 read 처리
             HandleServerResponse();

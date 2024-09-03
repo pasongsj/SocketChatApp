@@ -22,8 +22,6 @@ public:
 
 private:
 
-	bool AnyInput = false;
-
 	// SSL 객체
     SSL* m_ssl; 
 
