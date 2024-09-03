@@ -15,13 +15,14 @@ public:
     virtual ~SocketClient(); 
 
     // 클라이언트 설정
-    void Setting(); 
+    void Setting() override; 
     
     // 소켓 실행
-    void SocketRunning(); 
+    void SocketRunning() override; 
 
 private:
-    // SSL 객체
+
+	// SSL 객체
     SSL* m_ssl; 
 
     // 클라이언트 이름
@@ -41,4 +42,8 @@ private:
     
     // 서버 응답 처리
     void HandleServerResponse(); 
+
+
+	// ssl handshake
+	void SSLHandshake();
 };
