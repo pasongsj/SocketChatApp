@@ -6,6 +6,8 @@
 #include <poll.h>
 #include <vector>
 #include <openssl/err.h>
+#include <fcntl.h>
+
 
 // 생성자: IP 주소와 포트 번호를 설정
 SocketClient::SocketClient(const std::string& ipAddress, int port)
@@ -34,7 +36,7 @@ SocketClient::~SocketClient()
     }
 
     // SSL_CTX 종료
-    if (m_ctx) 
+    if (nullptr != m_ctx) 
     {
         SSL_CTX_free(m_ctx);
     }
@@ -85,7 +87,8 @@ void SocketClient::Setting()
         std::cerr << "Failed to load CA certificate" << std::endl;
         ERR_print_errors_fp(stderr);
         SSL_CTX_free(m_ctx);
-        exit(1);
+		m_ctx = nullptr;
+		exit(1);
     }
 
     // TLS/SSL 핸드쉐이크를 위한 SSL 객체 생성
@@ -100,16 +103,21 @@ void SocketClient::Setting()
         SSL_free(m_ssl);
         close(m_socketFd);
         SSL_CTX_free(m_ctx);
+		m_ctx = nullptr;
         exit(1);
     }
 
-    char buffer[1024];
+	SSL_write(m_ssl," ",1);
+	m_socketFd = SSL_get_fd(m_ssl);
+	fcntl(m_socketFd, F_GETFL, 0);
+/*    char buffer[1024];
     ssize_t bytesRead = SSL_read(m_ssl, buffer, sizeof(buffer) - 1);
     if (bytesRead > 0) 
     {
         buffer[bytesRead] = '\0'; // 문자열 끝에 NULL 추가
-	std::cout<<"Server Message :" << buffer << std::endl;
-    }
+	    std::cout<<"Server Message :" << buffer << std::endl;
+    }*/
+	std::cout<<"ssl handshake done\n";
 }
 
 // 사용자 입력 처리
@@ -119,7 +127,8 @@ void SocketClient::HandleInput()
     if (std::getline(std::cin, message)) 
     {
         SSL_write(m_ssl, message.c_str(), message.size());
-        if (message == "exit") 
+		std::cout<<"input done"<<std::endl;
+		if (message == "exit") 
         {
             m_Running = false;
             return;
@@ -169,7 +178,6 @@ void SocketClient::HandleServerResponse()
         } 
         else 
         {
-		std::cout<<MyName;
             std::cout << buffer << std::endl;
         }
     } 
@@ -189,32 +197,40 @@ void SocketClient::SocketRunning()
 
     // Poll setup
     std::vector<struct pollfd> fds;
-    fds.push_back({m_socketFd, POLLIN, 0});     // 소켓 모니터링
-    fds.push_back({STDIN_FILENO, POLLIN, 0});   // 터미널 입력 모니터링 
+    fds.push_back({STDIN_FILENO, POLLIN, 0});   // 터미널 입력 모니터링
+	fds.push_back({m_socketFd, POLLIN, 0});     // 소켓 모니터링
 
+
+	sleep(2);
     while (m_Running) 
     {
-        int poll_count = poll(fds.data(), fds.size(), 0);
-        if (poll_count < 0) 
+        int poll_count = poll(fds.data(), fds.size(), 500);
+		if (poll_count < 0) 
         {
             std::cerr << "Poll error" << std::endl;
             break;
         }
+		if(poll_count == 1)
+		{
+			continue;
+		}
+		if (fds[0].revents & POLLIN)
+        {
+			AnyInput = true;
+            HandleInput();
+        }
 
-        if (fds[0].revents & POLLIN) 
+        if (true == AnyInput && (fds[1].revents & POLLIN)) 
         {
             // 데이터 read 처리
             HandleServerResponse();
         }
 
-        if (fds[1].revents & POLLIN) 
-        {
-            HandleInput();
-        }
     }
-
+	std::cout<<"checker";
     SSL_shutdown(m_ssl);
     SSL_free(m_ssl);
     close(m_socketFd);
     SSL_CTX_free(m_ctx);
+	m_ctx = nullptr;
 }

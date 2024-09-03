@@ -21,7 +21,10 @@ public:
     void SocketRunning(); 
 
 private:
-    // SSL 객체
+
+	bool AnyInput = false;
+
+	// SSL 객체
     SSL* m_ssl; 
 
     // 클라이언트 이름

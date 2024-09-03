@@ -12,6 +12,8 @@
 #include <sys/select.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <fcntl.h>
+
 
 // 생성자
 SocketServer::SocketServer(const std::string& ipAddress, int port)
@@ -155,7 +157,13 @@ void SocketServer::ConnectNewClient()
 
 
 	std::string connectmsg = "ClientFd: " + std::to_string(clientFd) + " connected";
-	SSLBroadcastMessage(connectmsg,new_ssl,101); 
+//	SSLBroadcastMessage(connectmsg,new_ssl,101); 
+
+	char buffer[1024];
+	SSL_read(new_ssl,buffer,1);
+
+	fcntl(clientFd, F_GETFL, 0);
+
 }
 
 // 클라이언트 SSL 데이터 처리
@@ -245,7 +253,7 @@ void SocketServer::SocketAccept()
         if (FD_ISSET(m_socketFd, &readfds))
         {
             ConnectNewClient();
-            continue;
+			std::cout<<"ssl handshake done"<<std::endl;
         }
 
         // 클라이언트 데이터 처리
@@ -275,14 +283,15 @@ void SocketServer::RemoveClosedClients()
             if (m_SSLClientNames[c_ssl] == "Default")
             {
                 newMessage = "ClientFd: " + std::to_string(clientFd) + " leave";
-            }
+				SSLBroadcastMessage(newMessage, c_ssl,-1);
+			}
             else
             {
                 newMessage = m_SSLClientNames[c_ssl] + " leave";
                 m_NameSet.erase(m_SSLClientNames[c_ssl]);
+				SSLBroadcastMessage(newMessage, c_ssl);
             }
 
-            SSLBroadcastMessage(newMessage, c_ssl);
 
             m_SSLClients.erase(std::find(m_SSLClients.begin(), m_SSLClients.end(), c_ssl));
             m_SSLClientNames.erase(c_ssl);
@@ -438,4 +447,5 @@ void SocketServer::InitializeSSL()
 
     // SSL 초기화 성공 메시지
     std::cout << "서버 SSL 초기화 성공" << std::endl;
+
 }
