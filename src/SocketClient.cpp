@@ -79,6 +79,8 @@ void SocketClient::Setting()
     SSL_load_error_strings();
     OpenSSL_add_all_algorithms();
 
+//	const SSL_METHOD *c_method = TLS_client_method();
+
     m_ctx = SSL_CTX_new(TLS_client_method());
     if (!m_ctx) 
     {
@@ -87,13 +89,21 @@ void SocketClient::Setting()
         exit(1);
     }
 
-    if (SSL_CTX_load_verify_locations(m_ctx, "key/ca.pem", nullptr) <= 0) 
-    {
-        std::cerr << "Failed to load CA certificate" << std::endl;
+	// TLS 버전 설정 (TLS 1.2로 고정)
+    if (SSL_CTX_set_min_proto_version(m_ctx, TLS1_2_VERSION) == 0) {
+        fprintf(stderr, "SSL_CTX_set_min_proto_version failed\n");
         ERR_print_errors_fp(stderr);
         SSL_CTX_free(m_ctx);
-		m_ctx = nullptr;
 		exit(1);
+       // return 1;
+    }
+
+    if (SSL_CTX_set_max_proto_version(m_ctx, TLS1_2_VERSION) == 0) {
+        fprintf(stderr, "SSL_CTX_set_max_proto_version failed\n");
+        ERR_print_errors_fp(stderr);
+        SSL_CTX_free(m_ctx);
+        exit(1);
+		//return 1;
     }
 
     // TLS/SSL 핸드쉐이크를 위한 SSL 객체 생성
@@ -183,7 +193,6 @@ void SocketClient::HandleServerResponse()
     else 
     {
 		//EAGAIN : 사용 가능한 로컬 포트가 더이상 없거나 라우팅 캐싱에 공간이 충분하지 않
-		//EWOULDBLOCK : 읽을 데이터가 없는경우
 		if(errno == EAGAIN )
 		{
 			std::cout<<std::flush;
@@ -199,7 +208,7 @@ void SocketClient::HandleServerResponse()
 // 소켓 실행
 void SocketClient::SocketRunning() 
 {
-	std::cout<<"이름을 입력하세요 : ";
+	std::cout << "이름을 입력하세요 : " << std::flush;
 
 	std::vector<struct pollfd> fds;
 	fds.push_back({STDIN_FILENO, POLLIN, 0});   // 터미널 입력 모니터링

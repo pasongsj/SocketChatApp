@@ -23,5 +23,5 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 
 # Clean target
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+	rm -rf build 
 	rm -rf log
