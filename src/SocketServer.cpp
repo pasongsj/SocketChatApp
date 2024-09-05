@@ -158,6 +158,7 @@ void SocketServer::ConnectNewClient()
     m_SSLClients.push_back(new_ssl);
     m_SSLClientNames[new_ssl] = "Default";
 
+	SSLBroadcastMessage("ClientFd: " + std::to_string(clientFd) + " entered",nullptr, -1);
 
 	fcntl(clientFd, F_GETFL, 0);
 
@@ -423,24 +424,22 @@ void SocketServer::InitializeSSL()
         exit(1);
     }
 
-    // 인증서 및 개인 키 로드
-    if (SSL_CTX_use_certificate_file(m_ctx, "key/server.pem", SSL_FILETYPE_PEM) <= 0 ||
-        SSL_CTX_use_PrivateKey_file(m_ctx, "key/server-key.pem", SSL_FILETYPE_PEM) <= 0)
+    const char *cipher_list = "AES256-SHA";
+    if (SSL_CTX_set_cipher_list(m_ctx, cipher_list) != 1) {
+        fprintf(stderr, "Error setting cipher list\n");
+        ERR_print_errors_fp(stderr);
+    }
+
+
+	// 인증서 및 개인 키 로드
+    if (SSL_CTX_use_certificate_file(m_ctx, "testkey/server.crt", SSL_FILETYPE_PEM) <= 0 ||
+        SSL_CTX_use_PrivateKey_file(m_ctx, "testkey/server.key", SSL_FILETYPE_PEM) <= 0)
     {
         std::cerr << "Failed to load certificate or key" << std::endl;
         ERR_print_errors_fp(stderr);
         SSL_CTX_free(m_ctx);
         exit(1);
     }
-/*
-    // CA 인증서 로드
-    if (SSL_CTX_load_verify_locations(m_ctx, "key/ca.pem", nullptr) <= 0)
-    {
-        std::cerr << "Failed to load CA certificate" << std::endl;
-        ERR_print_errors_fp(stderr);
-        SSL_CTX_free(m_ctx);
-        exit(1);
-    }*/
 
     // SSL 초기화 성공 메시지
     std::cout << "서버 SSL 초기화 성공" << std::endl;

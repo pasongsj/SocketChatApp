@@ -24,8 +24,6 @@ int main()
 
     // 서버 또는 클라이언트 선택
     std::cout << "서버(s) 또는 클라이언트(c) 선택: ";
-   // std::cin >> choice;
-   // std::cin.ignore(); // 입력 버퍼에서 개행 문자 제거
 	std::string choice;
     std::getline(std::cin, choice);
    
@@ -36,14 +34,8 @@ int main()
     }
 
     // IP 주소와 포트 입력
-/*    std::cout << "서버 IP 입력: ";
-    std::getline(std::cin, ipAddress);
-    std::cout << "서버 포트 입력: ";
-    std::cin >> port;
-    std::cin.ignore(); // 입력 버퍼에서 개행 문자 제거
-*/
-	ipAddress= "127.0.0.1";
-	port = 1234;
+	ipAddress="127.0.0.1";// "192.168.22.33";
+	port = 23456;
 
     try {
         if (choice[0] == 's') 
@@ -64,7 +56,6 @@ int main()
         mySocket->CreateSocket();
 
         mySocket->Setting();
-		std::cout<<"main setting done"<<std::endl;
         // 소켓 실행
         mySocket->SocketRunning();
     } 
