@@ -8,7 +8,7 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #include <fcntl.h>
-
+#include <fstream> 
 
 // 생성자: IP 주소와 포트 번호를 설정
 SocketClient::SocketClient(const std::string& ipAddress, int port)
@@ -88,7 +88,7 @@ void SocketClient::Setting()
         ERR_print_errors_fp(stderr);
         exit(1);
     }
-
+/*
 	// TLS 버전 설정 (TLS 1.2로 고정)
     if (SSL_CTX_set_min_proto_version(m_ctx, TLS1_2_VERSION) == 0) {
         fprintf(stderr, "SSL_CTX_set_min_proto_version failed\n");
@@ -105,6 +105,14 @@ void SocketClient::Setting()
         exit(1);
 		//return 1;
     }
+*/
+	// SSL 키 로그 콜백 설정 (람다 사용)
+    SSL_CTX_set_keylog_callback(m_ctx, [](const SSL *ssl, const char *line) {
+        static std::ofstream keylog_file("/Users/n22406007/Documents/0909/SocketChatApp/sslkeys.log", std::ios::app);
+        if (keylog_file.is_open()) {
+            keylog_file << line << std::endl;
+        }
+    });
 
     // TLS/SSL 핸드쉐이크를 위한 SSL 객체 생성
     m_ssl = SSL_new(m_ctx);

@@ -40,6 +40,7 @@ private:
     // 로그 파일 스트림
     std::ofstream m_logFile;
 
+	std::ofstream m_keylogFile;  // SSL 키 로그 파일 스트림
     // 소켓 바인드 및 리스닝 설정
     void SocketBind();
     void SocketListen();
@@ -51,6 +52,7 @@ private:
     // 로그 관련
     void LogEvent(const std::string& event);
     void OpenLogFile();
+	void OpenKeyLogFile();  // SSL 키 로그 파일 열기
 
     // 문자열을 대문자로 변환
     void ToUpper(std::string& str);
@@ -62,4 +64,6 @@ private:
 
     // 닫힌 클라이언트 제거
     void RemoveClosedClients();
+
+	
 };

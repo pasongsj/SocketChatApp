@@ -1,6 +1,6 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Isrc -I/opt/homebrew/Cellar/openssl@3/3.3.1/include
-LDFLAGS = -L/opt/homebrew/Cellar/openssl@3/3.3.1/lib -lssl -lcrypto
+CXXFLAGS = -std=c++17 -Wall -Isrc -I/opt/homebrew/opt/openssl@3/include
+LDFLAGS = -L/opt/homebrew/opt/openssl@3/lib -lssl -lcrypto
 OBJDIR = build
 SRCDIR = src
 TARGET = $(OBJDIR)/my_socket_app
@@ -23,5 +23,5 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 
 # Clean target
 clean:
-	rm -rf build 
+	rm -rf $(OBJDIR)
 	rm -rf log

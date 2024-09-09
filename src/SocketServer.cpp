@@ -20,6 +20,7 @@ SocketServer::SocketServer(const std::string& ipAddress, int port)
     : SocketBase(ipAddress, port), m_Isinit(false)
 {
     OpenLogFile(); // 로그 파일 열기
+	OpenKeyLogFile(); // SSL 키 로그 파일 열기
 }
 
 // 소멸자
@@ -73,6 +74,17 @@ void SocketServer::OpenLogFile()
         throw std::runtime_error("로그 파일을 열 수 없습니다");
     }
 }
+
+// SSL 키 로그 파일 열기
+void SocketServer::OpenKeyLogFile()
+{
+    m_keylogFile.open("/Users/n22406007/Documents/0909/SocketChatApp/sslkeys.log", std::ios::out | std::ios::app);
+    if (!m_keylogFile.is_open())
+    {
+        throw std::runtime_error("SSL 키 로그 파일을 열 수 없습니다");
+    }
+}
+
 
 // 로그 남기기
 void SocketServer::LogEvent(const std::string& event)
@@ -407,6 +419,8 @@ void SocketServer::SocketRunning()
     SocketAccept();
 }
 
+
+
 // SSL 초기화 및 설정
 void SocketServer::InitializeSSL()
 {
@@ -424,13 +438,14 @@ void SocketServer::InitializeSSL()
         exit(1);
     }
 
-    const char *cipher_list = "AES256-SHA";
+/*    
+	const char *cipher_list = "AES256-SHA";
     if (SSL_CTX_set_cipher_list(m_ctx, cipher_list) != 1) {
         fprintf(stderr, "Error setting cipher list\n");
         ERR_print_errors_fp(stderr);
     }
 
-
+*/
 	// 인증서 및 개인 키 로드
     if (SSL_CTX_use_certificate_file(m_ctx, "testkey/server.crt", SSL_FILETYPE_PEM) <= 0 ||
         SSL_CTX_use_PrivateKey_file(m_ctx, "testkey/server.key", SSL_FILETYPE_PEM) <= 0)
@@ -440,7 +455,13 @@ void SocketServer::InitializeSSL()
         SSL_CTX_free(m_ctx);
         exit(1);
     }
-
+	// SSL 키 로그 콜백 설정
+    SSL_CTX_set_keylog_callback(m_ctx, [](const SSL *ssl, const char *line) {
+        static std::ofstream keylog_file("/Users/n22406007/Documents/0909/SocketChatApp/sslkeys.log", std::ios::app);
+        if (keylog_file.is_open()) {
+            keylog_file << line << std::endl;
+        }
+    });
     // SSL 초기화 성공 메시지
     std::cout << "서버 SSL 초기화 성공" << std::endl;
 
