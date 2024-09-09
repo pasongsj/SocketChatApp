@@ -89,7 +89,7 @@ void SocketServer::OpenKeyLogFile()
 // 로그 남기기
 void SocketServer::LogEvent(const std::string& event)
 {
-    std::cout << event << std::endl;
+    std::cout << event << std::flush;
     if (m_logFile.is_open())
     {
         std::time_t now = std::time(nullptr);
@@ -170,7 +170,7 @@ void SocketServer::ConnectNewClient()
     m_SSLClients.push_back(new_ssl);
     m_SSLClientNames[new_ssl] = "Default";
 
-	SSLBroadcastMessage("ClientFd: " + std::to_string(clientFd) + " entered",nullptr, -1);
+	SSLBroadcastMessage("ClientFd: " + std::to_string(clientFd) + " entered\n",nullptr, -1);
 
 	fcntl(clientFd, F_GETFL, 0);
 
@@ -187,7 +187,7 @@ void SocketServer::HandleClientSSLData(SSL* c_ssl)
         buffer[len] = '\0';
         std::string message(buffer);
 
-        if (message == "exit")
+        if (message == "exit\n")
         {
             m_SSLClosedClients.push_back(c_ssl);
             return;
@@ -196,6 +196,7 @@ void SocketServer::HandleClientSSLData(SSL* c_ssl)
         {
             if (m_SSLClientNames[c_ssl] == "Default")
             {
+				message.pop_back();
                 ToUpper(message);
                 if (
                     m_NameSet.find(message) == m_NameSet.end() &&
@@ -292,12 +293,12 @@ void SocketServer::RemoveClosedClients()
 
             if (m_SSLClientNames[c_ssl] == "Default")
             {
-                newMessage = "ClientFd: " + std::to_string(clientFd) + " leave";
+                newMessage = "ClientFd: " + std::to_string(clientFd) + " leave\n";
 				SSLBroadcastMessage(newMessage, c_ssl,-1);
 			}
             else
             {
-                newMessage = m_SSLClientNames[c_ssl] + " leave";
+                newMessage = m_SSLClientNames[c_ssl] + " leave\n";
                 m_NameSet.erase(m_SSLClientNames[c_ssl]);
 				SSLBroadcastMessage(newMessage, c_ssl);
             }
@@ -362,7 +363,7 @@ void SocketServer::SSLBroadcastMessage(const std::string& message, SSL* senderSS
             break;
         case 2:
             // 플래그가 2인 경우, 발신자를 제외한 모든 클라이언트에게 입장 메시지 전송
-            logMessage = m_SSLClientNames[senderSSL] + " entered";
+            logMessage = m_SSLClientNames[senderSSL] + " entered\n";
             for (SSL* c_ssl : m_SSLClients)
             {
                 if (c_ssl != senderSSL && m_SSLClientNames[c_ssl] != "Default")
@@ -380,7 +381,7 @@ void SocketServer::SSLBroadcastMessage(const std::string& message, SSL* senderSS
             break;
         case 100:
             // 플래그가 100인 경우, 발신자에게만 에러 메시지 전송
-            logMessage = "ClientFd: " + std::to_string(SSL_get_fd(senderSSL)) + " Invalid input";
+            logMessage = "ClientFd: " + std::to_string(SSL_get_fd(senderSSL)) + " Invalid input\n";
             if (SSL_write(senderSSL, message.c_str(), message.size()) <= 0)
             {
                 std::cerr << "메시지 전송 실패" << std::endl;

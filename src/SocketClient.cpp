@@ -139,6 +139,7 @@ void SocketClient::HandleInput()
 	std::string message;
 	if (std::getline(std::cin, message)) 
     {
+		message += '\n';
 		ssize_t writebytes = message.size();
 		if(writebytes > 0)
 		{
@@ -195,7 +196,7 @@ void SocketClient::HandleServerResponse()
         } 
         else 
         {
-            std::cout << buffer << std::endl;
+            std::cout << buffer << std::flush;
         }
     }
     else 
